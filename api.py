@@ -1,14 +1,18 @@
 from flask import Flask
 from neo4j import GraphDatabase
 
-URI = "neo4j+s://84c9b254.databases.neo4j.io"
+URI = "neo4j+ssc://84c9b254.databases.neo4j.io"
 USERNAME = "neo4j"
 PASSWORD = "9BPTWpu5kp2nWjPyfuhfn5zorZKBrh5jBpKC3uBw908"
 
-driver = GraphDatabase.driver(URI, auth=basic_auth(USERNAME,PASSWORD))
+driver = GraphDatabase.driver(URI, auth=(USERNAME,PASSWORD))
 
+with driver.session() as session:
+    result = session.run("RETURN 1")
+    for record in result:
+        print(record)
 
-
+'''
 app = Flask(__name__)
 #TEesttdjskfjkldjfksl
 
@@ -32,3 +36,4 @@ def returnCar():
     #TODO Car’s status (e.g., ok or damaged) during the return will also be sent as a parameter. The system must check that the customer with customer-id has rented the car. 
     # The car’s status is changed from ‘booked’ to ‘available’ or ‘damaged’.
     return
+'''
