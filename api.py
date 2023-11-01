@@ -1,4 +1,12 @@
 from flask import Flask
+from neo4j import GraphDatabase
+
+URI = "<URI for Neo4j database>"
+USERNAME = ""
+PASSWORD = ""
+
+driver = GraphDatabase.driver(URI, auth=basic_auth(USERNAME,PASSWORD))
+
 
 
 app = Flask(__name__)
