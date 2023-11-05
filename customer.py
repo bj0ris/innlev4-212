@@ -1,8 +1,22 @@
 from flask import Flask, jsonify, request, abort
 from neo4j import GraphDatabase, exceptions
 
+URI = "neo4j+ssc://84c9b254.databases.neo4j.io"
+USERNAME = "neo4j"
+PASSWORD = "9BPTWpu5kp2nWjPyfuhfn5zorZKBrh5jBpKC3uBw908"
 
-def create_car(json,dbSession):
+driver = GraphDatabase.driver(URI, auth=(USERNAME,PASSWORD))
+
+def get_db_session():
+    # Creates a database session, handling potential connection errors
+    try:
+        return driver.session()
+    except exceptions.Neo4jError as e:
+        # If a database connection error occurs, the API will respond with a 500 error
+        abort(500, description=f"Database connection error: {str(e)}")
+
+
+def create_customer(json,dbSession):
     # Extract car data from the request's JSON body
     
     id = json.get('id')
@@ -45,3 +59,64 @@ def create_car(json,dbSession):
             return jsonify({"success": False, "message": "Customer ID already exists"}), 400
         # Handle other potential neo4j exceptions
         abort(500, description=f"Failed to create customer: {e}")
+
+#create_customer({
+#    "address":"TestVeien2",
+#    "name":"Pjotr",
+#    "id":"customer14",
+#    "age": 14
+#},get_db_session())
+
+def read_customer():
+    #Returns list of all customers
+    records, summary, keys = driver.execute_query("MATCH (n:Customer) RETURN n LIMIT 25;",database_="neo4j")
+    #returnDict = {}
+    for record in records:
+        print(record.data())
+    #print(records)
+
+read_customer()
+
+def update_customer(id, changejson):
+    #Update a customers address,name, and age
+    #"adress","name" or "age" as key. The new value as value
+    try:
+        records, summary, keys = driver.execute_query(
+            """
+            MATCH (p:Customer {id: $id})
+            SET p.age = $age
+            SET p.name = $name
+            SET p.address = $address
+            """, 
+            id = id,
+            address = changejson.get("address"),
+            name=changejson.get("name"), 
+            age=changejson.get("age"),
+            database_="neo4j",
+            )
+        print(f"Query counters: {summary.counters}.")
+    except exceptions.Neo4jError as e:
+        if 'ConstraintValidationFailed' in str(e):
+            return jsonify({"success": False, "message": "Customer ID already exists"}), 400
+        # Handle other potential neo4j exceptions
+        abort(500, description=f"Failed to create customer: {e}")
+        
+#update_customer("customer14", 
+#                {"name":"Pjotr",
+#                 "age":14,
+#                 "address" : "TestVeien2"
+#                 })
+
+
+
+def delete_customer(id):
+    records, summary, keys = driver.execute_query("""
+    MATCH (p:Customer {id: $id})
+    DETACH DELETE p
+    """, id=id,
+    database_="neo4j",
+    )
+    print(f"Query counters: {summary.counters}.")
+#delete_customer("customer14")
+
+driver.close()
