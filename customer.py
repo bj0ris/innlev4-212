@@ -30,7 +30,7 @@ def create_customer(json,dbSession):
 
     try:
         #with dbSession() as session:
-        # Perform a transaction to create a new car
+        # Perform a transaction to create a new customer
         result = dbSession.write_transaction(
             lambda tx: tx.run(
                 """
@@ -60,28 +60,20 @@ def create_customer(json,dbSession):
         # Handle other potential neo4j exceptions
         abort(500, description=f"Failed to create customer: {e}")
 
-#create_customer({
-#    "address":"TestVeien2",
-#    "name":"Pjotr",
-#    "id":"customer14",
-#    "age": 14
-#},get_db_session())
-
-def read_customer():
+def read_customer(dbDriver):
     #Returns list of all customers
-    records, summary, keys = driver.execute_query("MATCH (n:Customer) RETURN n LIMIT 25;",database_="neo4j")
-    #returnDict = {}
+    records, summary, keys = dbDriver.execute_query("MATCH (n:Customer) RETURN n LIMIT 25;",database_="neo4j")
+    returnList = []
     for record in records:
-        print(record.data())
-    #print(records)
+        returnList.append(record.data())
+    return returnList
 
-read_customer()
 
-def update_customer(id, changejson):
+def update_customer(dbDriver,id, changejson):
     #Update a customers address,name, and age
     #"adress","name" or "age" as key. The new value as value
     try:
-        records, summary, keys = driver.execute_query(
+        records, summary, keys = dbDriver.execute_query(
             """
             MATCH (p:Customer {id: $id})
             SET p.age = $age
@@ -109,14 +101,11 @@ def update_customer(id, changejson):
 
 
 
-def delete_customer(id):
-    records, summary, keys = driver.execute_query("""
+def delete_customer(dbDriver,id):
+    records, summary, keys = dbDriver.execute_query("""
     MATCH (p:Customer {id: $id})
     DETACH DELETE p
     """, id=id,
     database_="neo4j",
     )
     print(f"Query counters: {summary.counters}.")
-#delete_customer("customer14")
-
-driver.close()
