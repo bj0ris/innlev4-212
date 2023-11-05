@@ -1,5 +1,5 @@
-from flask import Flask
-from neo4j import GraphDatabase
+from flask import Flask, jsonify, request, abort
+from neo4j import GraphDatabase, exceptions
 
 URI = "neo4j+ssc://84c9b254.databases.neo4j.io"
 USERNAME = "neo4j"
@@ -7,10 +7,61 @@ PASSWORD = "9BPTWpu5kp2nWjPyfuhfn5zorZKBrh5jBpKC3uBw908"
 
 driver = GraphDatabase.driver(URI, auth=(USERNAME,PASSWORD))
 
-with driver.session() as session:
-    result = session.run("RETURN 1")
-    for record in result:
-        print(record)
+def get_db_session():
+    # Creates a database session, handling potential connection errors
+    try:
+        return driver.session()
+    except exceptions.Neo4jError as e:
+        # If a database connection error occurs, the API will respond with a 500 error
+        abort(500, description=f"Database connection error: {str(e)}")
+
+@app.route("/order-car", methods=['POST'])
+def order_car():
+    # Extracting customer and car IDs from the request's JSON body
+    data = request.json
+    customer_id = data.get('customer_id')
+    car_id = data.get('car_id')
+
+    # Input validation to ensure required data is present
+    if not customer_id or not car_id:
+        return jsonify({"success": False, "message": "Missing customer_id or car_id"}), 400
+
+    try:
+        with get_db_session() as session:
+            # Perform a transaction to book a car for a customer
+            result = session.write_transaction(
+                lambda tx: tx.run(
+                    """
+                    // Find the customer by ID and check if they have already booked a car
+                    MATCH (customer:Customer {id: $customer_id})
+                    OPTIONAL MATCH (customer)-[r:BOOKED]->(c:Car)
+                    // Only proceed with booking if the customer has not booked another car
+                    WITH customer, c, CASE WHEN c IS NULL THEN true ELSE false END as canBook
+                    // Find the requested car by ID and ensure it is available
+                    MATCH (car:Car {id: $car_id})
+                    WHERE car.status = 'available' AND canBook
+                    // If the car is available and the customer can book, update the car's status and create the booking relationship
+                    SET car.status = 'booked'
+                    CREATE (customer)-[:BOOKED]->(car)
+                    // Return whether the booking was successful
+                    RETURN count(car) > 0 as booked
+                    """,
+                    customer_id=customer_id,
+                    car_id=car_id
+                ).single()
+            )
+        # If a car was successfully booked, return a success response
+        if result and result["booked"]:
+            return jsonify({"success": True, "message": "Car booked successfully."}), 200
+        else:
+            # If booking was unsuccessful, either due to the car being unavailable or customer already having a booked car
+            return jsonify({"success": False, "message": "Car booking failed or customer already has a booked car."}), 400
+    except exceptions.Neo4jError as e:
+        # If any other Neo4j-related error occurs during the transaction, respond with a 500 error
+        abort(500, description=f"Transaction failed: {str(e)}")
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 '''
 app = Flask(__name__)
