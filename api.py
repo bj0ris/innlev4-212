@@ -70,7 +70,7 @@ def cancel_order_car():
     # Input validation to ensure needed data is present
     if not customer_id or not car_id:
         return jsonify({"success": False, "message": "Missing customer_id or car_id"}), 400
- 
+
     try: 
         with get_db_session() as session:
             #Transaction to cancel car booking for customer
@@ -80,28 +80,26 @@ def cancel_order_car():
                     // Find customer by ID
                     MATCH (customer:Customer {id: $customer_id})
                     // Find car by ID, check if booked
-                    MATCH (customer)-[r:BOOKED] ->(car:Car {id: $car_id})
+                    MATCH (customer)-[r:BOOKED]->(car:Car {id: $car_id})
                     // If car is booked by customer, mark available and remove booking
                     DELETE r
                     SET car.status = 'available'
-                    // RETURN count(r) > 0 as canceled
+                    // Return count(r) > 0 as canceled
                     """,
-                    customer_id = customer_id,
-                    car_id= car_id
-
-
+                    customer_id=customer_id,
+                    car_id=car_id
                 ).single()
             )
-        #If booking canceled
+        # If booking canceled
         if result and result["canceled"]:
             return jsonify({"success": True, "message": "Booking canceled"}), 200
         else:
-            #If cancellation unsuccessful
+            # If cancellation unsuccessful
             return jsonify({"success": False, "message": "Cancellation failed"}), 400
-        except exceptions.Neo4jError as e:
-            #If neo4j related error with transaction respond with 500 error
-            abort(500, description=f"Transaction failed: {str(e)}")
-            
+    except exceptions.Neo4jError as e:
+        # If Neo4j-related error with transaction respond with 500 error
+        abort(500, description=f"Transaction failed: {str(e)}")
+
 
 
 @app.route("/create-car", methods=['POST'])
