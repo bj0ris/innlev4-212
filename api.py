@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request, abort
 from neo4j import GraphDatabase, exceptions
+import customer
 
 app = Flask(__name__)
 
