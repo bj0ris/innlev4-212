@@ -69,8 +69,8 @@ def cancel_order_car():
 
     # Input validation to ensure needed data is present
     if not customer_id or not car_id:
-        return jsonify({"success:" False, "message": "Missing customer_id or car_id"}), 400
-
+        return jsonify({"success": False, "message": "Missing customer_id or car_id"}), 400
+ 
     try: 
         with get_db_session() as session:
             #Transaction to cancel car booking for customer
