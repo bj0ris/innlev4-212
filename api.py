@@ -1,15 +1,11 @@
 from flask import Flask, jsonify, request, abort
 from neo4j import GraphDatabase, exceptions
 
-app = Flask(__name__)
-
 URI = "neo4j+ssc://84c9b254.databases.neo4j.io"
 USERNAME = "neo4j"
 PASSWORD = "9BPTWpu5kp2nWjPyfuhfn5zorZKBrh5jBpKC3uBw908"
 
 driver = GraphDatabase.driver(URI, auth=(USERNAME,PASSWORD))
-
-
 
 def get_db_session():
     # Creates a database session, handling potential connection errors
@@ -73,7 +69,7 @@ def cancel_order_car():
 
     # Input validation to ensure needed data is present
     if not customer_id or not car_id:
-        return jsonify({"success": False, "message": "Missing customer_id or car_id"}), 400
+        return jsonify({"success:" False, "message": "Missing customer_id or car_id"}), 400
 
     try: 
         with get_db_session() as session:
@@ -84,90 +80,28 @@ def cancel_order_car():
                     // Find customer by ID
                     MATCH (customer:Customer {id: $customer_id})
                     // Find car by ID, check if booked
-                    MATCH (customer)-[r:BOOKED]->(car:Car {id: $car_id})
+                    MATCH (customer)-[r:BOOKED] ->(car:Car {id: $car_id})
                     // If car is booked by customer, mark available and remove booking
                     DELETE r
                     SET car.status = 'available'
-                    // Return count(r) > 0 as canceled
+                    // RETURN count(r) > 0 as canceled
                     """,
-                    customer_id=customer_id,
-                    car_id=car_id
+                    customer_id = customer_id,
+                    car_id= car_id
+
+
                 ).single()
             )
-        # If booking canceled
+        #If booking canceled
         if result and result["canceled"]:
             return jsonify({"success": True, "message": "Booking canceled"}), 200
         else:
-            # If cancellation unsuccessful
+            #If cancellation unsuccessful
             return jsonify({"success": False, "message": "Cancellation failed"}), 400
-    except exceptions.Neo4jError as e:
-        # If Neo4j-related error with transaction respond with 500 error
-        abort(500, description=f"Transaction failed: {str(e)}")
-
-
-
-@app.route("/create-car", methods=['POST'])
-def create_car():
-    # Extract car data from the request's JSON body
-    data = request.json
-    car_id = data.get('id')
-    make = data.get('make')
-    model = data.get('model')
-    year = data.get('year')
-    location = data.get('location')
-    status = data.get('status')
-
-    # Validate the received data (ensure all fields are provided)
-    if not all([car_id, make, model, year, location, status]):
-        return jsonify({"success": False, "message": "All car details must be provided"}), 400
-
-    # Ensure the status is one of the allowed values
-    allowed_statuses = ['available', 'booked', 'rented', 'maintenance']
-    if status not in allowed_statuses:
-        return jsonify({"success": False, "message": f"Status must be one of {allowed_statuses}"}), 400
-
-    # Convert year to integer if it's not already
-    try:
-        year = int(year)
-    except ValueError:
-        return jsonify({"success": False, "message": "Year must be a number"}), 400
-
-    try:
-        with get_db_session() as session:
-            # Perform a transaction to create a new car
-            result = session.write_transaction(
-                lambda tx: tx.run(
-                    """
-                    CREATE (car:Car {
-                        id: $car_id, 
-                        make: $make, 
-                        model: $model, 
-                        year: $year, 
-                        location: $location, 
-                        status: $status
-                    })
-                    RETURN car
-                    """,
-                    car_id=car_id,
-                    make=make,
-                    model=model,
-                    year=year,
-                    location=location,
-                    status=status
-                ).single()
-            )
-            # Return a success response with the created car's details
-            created_car = result.get("car") if result else None
-            if created_car:
-                return jsonify({"success": True, "car": created_car}), 201
-            else:
-                return jsonify({"success": False, "message": "Car could not be created"}), 400
-    except exceptions.Neo4jError as e:
-        if 'ConstraintValidationFailed' in str(e):
-            return jsonify({"success": False, "message": "Car ID already exists"}), 400
-        # Handle other potential neo4j exceptions
-        abort(500, description=f"Failed to create car: {str(e)}")
-
+        except exceptions.Neo4jError as e:
+            #If neo4j related error with transaction respond with 500 error
+            abort(500, description=f"Transaction failed: {str(e)}")
+            
 
 if __name__ == '__main__':
     app.run(debug=True)
