@@ -103,6 +103,70 @@ def cancel_order_car():
             abort(500, description=f"Transaction failed: {str(e)}")
             
 
+
+@app.route("/create-car", methods=['POST'])
+def create_car():
+    # Extract car data from the request's JSON body
+    data = request.json
+    car_id = data.get('id')
+    make = data.get('make')
+    model = data.get('model')
+    year = data.get('year')
+    location = data.get('location')
+    status = data.get('status')
+
+    # Validate the received data (ensure all fields are provided)
+    if not all([car_id, make, model, year, location, status]):
+        return jsonify({"success": False, "message": "All car details must be provided"}), 400
+
+    # Ensure the status is one of the allowed values
+    allowed_statuses = ['available', 'booked', 'rented', 'maintenance']
+    if status not in allowed_statuses:
+        return jsonify({"success": False, "message": f"Status must be one of {allowed_statuses}"}), 400
+
+    # Convert year to integer if it's not already
+    try:
+        year = int(year)
+    except ValueError:
+        return jsonify({"success": False, "message": "Year must be a number"}), 400
+
+    try:
+        with get_db_session() as session:
+            # Perform a transaction to create a new car
+            result = session.write_transaction(
+                lambda tx: tx.run(
+                    """
+                    CREATE (car:Car {
+                        id: $car_id, 
+                        make: $make, 
+                        model: $model, 
+                        year: $year, 
+                        location: $location, 
+                        status: $status
+                    })
+                    RETURN car
+                    """,
+                    car_id=car_id,
+                    make=make,
+                    model=model,
+                    year=year,
+                    location=location,
+                    status=status
+                ).single()
+            )
+            # Return a success response with the created car's details
+            created_car = result.get("car") if result else None
+            if created_car:
+                return jsonify({"success": True, "car": created_car}), 201
+            else:
+                return jsonify({"success": False, "message": "Car could not be created"}), 400
+    except exceptions.Neo4jError as e:
+        if 'ConstraintValidationFailed' in str(e):
+            return jsonify({"success": False, "message": "Car ID already exists"}), 400
+        # Handle other potential neo4j exceptions
+        abort(500, description=f"Failed to create car: {str(e)}")
+
+
 if __name__ == '__main__':
     app.run(debug=True)
 
