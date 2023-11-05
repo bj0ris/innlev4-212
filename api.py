@@ -74,36 +74,39 @@ def cancel_order_car():
     if not customer_id or not car_id:
         return jsonify({"success": False, "message": "Missing customer_id or car_id"}), 400
 
-    try: 
+    try:
         with get_db_session() as session:
-            #Transaction to cancel car booking for customer
+            # Transaction to cancel car booking for a customer
             result = session.write_transaction(
                 lambda tx: tx.run(
-                    """ 
+                    """
                     // Find customer by ID
                     MATCH (customer:Customer {id: $customer_id})
-                    // Find car by ID, check if booked
-                    MATCH (customer)-[r:BOOKED] ->(car:Car {id: $car_id})
-                    // If car is booked by customer, mark available and remove booking
+                    // Optionally match the booked relationship to the car
+                    OPTIONAL MATCH (customer)-[r:BOOKED]->(car:Car {id: $car_id})
+                    // Capture if the relationship existed before deletion
+                    WITH r, car, count(r) > 0 as wasBooked
+                    // Delete the relationship if it existed
                     DELETE r
-                    SET car.status = 'available'
-                    // RETURN count(r) > 0 as canceled
+                    // Set car status to 'available' only if it was booked
+                    SET car.status = CASE WHEN wasBooked THEN 'available' ELSE car.status END
+                    // Return the status of the cancellation
+                    RETURN wasBooked as canceled
                     """,
-                    customer_id = customer_id,
-                    car_id= car_id
-
-
+                    customer_id=customer_id,
+                    car_id=car_id
                 ).single()
             )
-        #If booking canceled
+        # If the booking was successfully canceled
         if result and result["canceled"]:
-            return jsonify({"success": True, "message": "Booking canceled"}), 200
+            return jsonify({"success": True, "message": "Booking canceled successfully."}), 200
         else:
-            #If cancellation unsuccessful
-            return jsonify({"success": False, "message": "Cancellation failed"}), 400
+            # If cancellation was unsuccessful
+            return jsonify({"success": False, "message": "Cancellation failed or booking does not exist."}), 400
     except exceptions.Neo4jError as e:
-        #If neo4j related error with transaction respond with 500 error
+        # If a Neo4j-related error occurs during the transaction, respond with a 500 error
         abort(500, description=f"Transaction failed: {str(e)}")
+
 
 
 @app.route("/rent-car", methods=['POST'])
