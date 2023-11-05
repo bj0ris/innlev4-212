@@ -1,11 +1,15 @@
 from flask import Flask, jsonify, request, abort
 from neo4j import GraphDatabase, exceptions
 
+app = Flask(__name__)
+
 URI = "neo4j+ssc://84c9b254.databases.neo4j.io"
 USERNAME = "neo4j"
 PASSWORD = "9BPTWpu5kp2nWjPyfuhfn5zorZKBrh5jBpKC3uBw908"
 
 driver = GraphDatabase.driver(URI, auth=(USERNAME,PASSWORD))
+
+
 
 def get_db_session():
     # Creates a database session, handling potential connection errors
